@@ -20,8 +20,8 @@ func deserializeJson(message []byte) ([]interface{}, error) {
 	return data, nil
 }
 
-func SerializeMessage(fruitRecords []fruititem.FruitItem) (*middleware.Message, error) {
-	data := []interface{}{}
+func SerializeMessage(fruitRecords []fruititem.FruitItem, id int) (*middleware.Message, error) {
+	data := [][]interface{}{}
 	for _, fruitRecord := range fruitRecords {
 		datum := []interface{}{
 			fruitRecord.Fruit,
@@ -30,7 +30,7 @@ func SerializeMessage(fruitRecords []fruititem.FruitItem) (*middleware.Message, 
 		data = append(data, datum)
 	}
 
-	body, err := serializeJson(data)
+	body, err := json.Marshal(InnerMessage{ClientID: id, Records: data})
 	if err != nil {
 		return nil, err
 	}
@@ -39,32 +39,36 @@ func SerializeMessage(fruitRecords []fruititem.FruitItem) (*middleware.Message, 
 	return &message, nil
 }
 
-func DeserializeMessage(message *middleware.Message) ([]fruititem.FruitItem, bool, error) {
-	data, err := deserializeJson([]byte((*message).Body))
-	if err != nil {
-		return nil, false, err
+func DeserializeMessage(message *middleware.Message) ([]fruititem.FruitItem, int, bool, error) {
+	var innerMessage InnerMessage
+	if err := json.Unmarshal([]byte((*message).Body), &innerMessage); err != nil {
+		return nil, 0, false, err
 	}
 
 	fruitRecords := []fruititem.FruitItem{}
-	for _, datum := range data {
-		fruitPair, ok := datum.([]interface{})
-		if !ok {
-			return nil, false, errors.New("Datum is not an array")
+	for _, fruitPair := range innerMessage.Records {
+		if len(fruitPair) != 2 {
+			return nil, 0, false, errors.New("Datum is not an array")
 		}
 
 		fruit, ok := fruitPair[0].(string)
 		if !ok {
-			return nil, false, errors.New("Datum is not a (fruit, amount) pair")
+			return nil, 0, false, errors.New("Datum is not a (fruit, amount) pair")
 		}
 
 		fruitAmount, ok := fruitPair[1].(float64)
 		if !ok {
-			return nil, false, errors.New("Datum is not a (fruit, amount) pair")
+			return nil, 0, false, errors.New("Datum is not a (fruit, amount) pair")
 		}
 
 		fruitRecord := fruititem.FruitItem{Fruit: fruit, Amount: uint32(fruitAmount)}
 		fruitRecords = append(fruitRecords, fruitRecord)
 	}
 
-	return fruitRecords, len(fruitRecords) == 0, nil
+	return fruitRecords, innerMessage.ClientID, len(fruitRecords) == 0, nil
+}
+
+type InnerMessage struct {
+	ClientID int
+	Records  [][]interface{}
 }

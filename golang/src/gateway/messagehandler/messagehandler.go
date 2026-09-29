@@ -7,10 +7,15 @@ import (
 )
 
 type MessageHandler struct {
+	uuid int
 }
 
-func NewMessageHandler() MessageHandler {
-	return MessageHandler{}
+func CreateMessageHandler(uuid int) MessageHandler {
+	return MessageHandler{uuid}
+}
+
+func (messageHandler *MessageHandler) NewMessageHandler() MessageHandler {
+	return MessageHandler{uuid + 1}
 }
 
 func (messageHandler *MessageHandler) SerializeDataMessage(fruitRecord fruititem.FruitItem) (*middleware.Message, error) {
