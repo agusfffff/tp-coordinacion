@@ -20,7 +20,7 @@ var (
 
 const publishTimeout = 5 * time.Second
 const consumerName = "consumer-"
-const prefetchMsg = 10
+const prefetchMsg = 1
 
 func CreateQueueMiddleware(queueName string, connectionSettings ConnSettings) (Middleware, error) {
 	conn, ch, err := dialAndConnectCh(connectionSettings.Hostname, connectionSettings.Port)
@@ -31,7 +31,7 @@ func CreateQueueMiddleware(queueName string, connectionSettings ConnSettings) (M
 
 	q, err := ch.QueueDeclare(
 		queueName,
-		true,
+		false,
 		false,
 		false,
 		false,
@@ -67,7 +67,7 @@ func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 	}
 
 	err := q.channel.Qos(
-		1,
+		prefetchMsg,
 		0,
 		false,
 	)
@@ -169,9 +169,8 @@ func (q *queueMiddleware) Send(msg Message) error {
 		false,
 		false,
 		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
-			ContentType:  "text/plain",
-			Body:         []byte(msg.Body),
+			ContentType: "text/plain",
+			Body:        []byte(msg.Body),
 		})
 
 	if err != nil {
@@ -269,7 +268,7 @@ func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 
 	q, err := e.channel.QueueDeclare(
 		queueName,
-		true,
+		false,
 		false,
 		false,
 		false,
