@@ -84,7 +84,7 @@ func (sum *Sum) handleEndOfRecordMessage(clientId int) error {
 	clientRecords := sum.fruitItemMap[clientId]
 	for _, fruitData := range clientRecords {
 		fruitRecord := []fruititem.FruitItem{fruitData}
-		message, err := inner.SerializeMessage(fruitRecord, clientId)
+		message, err := inner.SerializeMessage(fruitRecord, clientId, false)
 		if err != nil {
 			slog.Debug("While serializing message", "err", err)
 			return err
@@ -96,7 +96,7 @@ func (sum *Sum) handleEndOfRecordMessage(clientId int) error {
 	}
 
 	eofMessage := []fruititem.FruitItem{}
-	message, err := inner.SerializeMessage(eofMessage, clientId)
+	message, err := inner.SerializeMessage(eofMessage, clientId, true)
 	if err != nil {
 		slog.Debug("While serializing EOF message", "err", err)
 		return err

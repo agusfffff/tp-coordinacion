@@ -8,19 +8,17 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/middleware"
 )
 
-func serializeJson(message []interface{}) ([]byte, error) {
-	return json.Marshal(message)
+func serializeJson(clienId int, data [][]interface{}, eof bool) ([]byte, error) {
+	return json.Marshal(InnerMessage{ClientID: clienId, Records: data, EOF: eof})
 }
 
-func deserializeJson(message []byte) ([]interface{}, error) {
-	var data []interface{}
-	if err := json.Unmarshal(message, &data); err != nil {
-		return nil, err
-	}
-	return data, nil
+func deserializeJson(message []byte) (InnerMessage, error) {
+	var innerMessage InnerMessage
+	err := json.Unmarshal(message, &innerMessage)
+	return innerMessage, err
 }
 
-func SerializeMessage(fruitRecords []fruititem.FruitItem, id int) (*middleware.Message, error) {
+func SerializeMessage(fruitRecords []fruititem.FruitItem, id int, eof bool) (*middleware.Message, error) {
 	data := [][]interface{}{}
 	for _, fruitRecord := range fruitRecords {
 		datum := []interface{}{
@@ -30,7 +28,7 @@ func SerializeMessage(fruitRecords []fruititem.FruitItem, id int) (*middleware.M
 		data = append(data, datum)
 	}
 
-	body, err := json.Marshal(InnerMessage{ClientID: id, Records: data})
+	body, err := serializeJson(id, data, eof)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +38,8 @@ func SerializeMessage(fruitRecords []fruititem.FruitItem, id int) (*middleware.M
 }
 
 func DeserializeMessage(message *middleware.Message) ([]fruititem.FruitItem, int, bool, error) {
-	var innerMessage InnerMessage
-	if err := json.Unmarshal([]byte((*message).Body), &innerMessage); err != nil {
+	innerMessage, err := deserializeJson([]byte((*message).Body))
+	if err != nil {
 		return nil, 0, false, err
 	}
 
@@ -65,10 +63,11 @@ func DeserializeMessage(message *middleware.Message) ([]fruititem.FruitItem, int
 		fruitRecords = append(fruitRecords, fruitRecord)
 	}
 
-	return fruitRecords, innerMessage.ClientID, len(fruitRecords) == 0, nil
+	return fruitRecords, innerMessage.ClientID, innerMessage.EOF, nil
 }
 
 type InnerMessage struct {
 	ClientID int
 	Records  [][]interface{}
+	EOF      bool
 }

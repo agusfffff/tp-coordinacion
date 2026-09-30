@@ -77,11 +77,10 @@ func (aggregation *Aggregation) handleMessage(msg middleware.Message, ack func()
 	aggregation.handleDataMessage(clientId, fruitRecords)
 }
 
-func (aggregation *Aggregation) handleEndOfRecordsMessage(clientId int) error {
-	slog.Info("Received End Of Records message", "client", clientId)
-
+func (aggregation *Aggregation) sendFruitTop(clientId int) error {
 	fruitTopRecords := aggregation.buildFruitTop(clientId)
-	message, err := inner.SerializeMessage(fruitTopRecords, clientId)
+
+	message, err := inner.SerializeMessage(fruitTopRecords, clientId, false)
 	if err != nil {
 		slog.Debug("While serializing top message", "err", err)
 		return err
@@ -91,8 +90,29 @@ func (aggregation *Aggregation) handleEndOfRecordsMessage(clientId int) error {
 		return err
 	}
 
+	return nil
+}
+
+func (aggregation *Aggregation) handleEndOfRecordsMessage(clientId int) error {
+	slog.Info("Received End Of Records message", "client", clientId)
+
+	err := aggregation.sendFruitTop(clientId)
+	if err != nil {
+		return err
+	}
+
+	err = aggregation.sendEOF(clientId)
+	if err != nil {
+		return err
+	}
+
+	delete(aggregation.fruitItemMap, clientId)
+	return nil
+}
+
+func (aggregation *Aggregation) sendEOF(clientId int) error {
 	eofMessage := []fruititem.FruitItem{}
-	message, err = inner.SerializeMessage(eofMessage, clientId)
+	message, err := inner.SerializeMessage(eofMessage, clientId, true)
 	if err != nil {
 		slog.Debug("While serializing EOF message", "err", err)
 		return err
@@ -101,7 +121,6 @@ func (aggregation *Aggregation) handleEndOfRecordsMessage(clientId int) error {
 		slog.Debug("While sending EOF message", "err", err)
 		return err
 	}
-	delete(aggregation.fruitItemMap, clientId)
 	return nil
 }
 
