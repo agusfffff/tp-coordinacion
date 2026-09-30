@@ -11,30 +11,31 @@ import (
 var nextClientID atomic.Int64
 
 type MessageHandler struct {
-	clientID int
+	clientId int
 }
 
 func NewMessageHandler() MessageHandler {
-	return MessageHandler{clientID: int(nextClientID.Add(1))}
+	clientId := int(nextClientID.Add(1))
+	return MessageHandler{clientId}
 }
 
 func (messageHandler *MessageHandler) SerializeDataMessage(fruitRecord fruititem.FruitItem) (*middleware.Message, error) {
 	data := []fruititem.FruitItem{fruitRecord}
-	return inner.SerializeMessage(data, messageHandler.clientID)
+	return inner.SerializeMessage(data, messageHandler.clientId)
 }
 
 func (messageHandler *MessageHandler) SerializeEOFMessage() (*middleware.Message, error) {
 	data := []fruititem.FruitItem{}
-	return inner.SerializeMessage(data, messageHandler.clientID)
+	return inner.SerializeMessage(data, messageHandler.clientId)
 }
 
 func (messageHandler *MessageHandler) DeserializeResultMessage(message *middleware.Message) ([]fruititem.FruitItem, error) {
-	fruitRecords, clientID, _, err := inner.DeserializeMessage(message)
+	fruitRecords, clientId, _, err := inner.DeserializeMessage(message)
 	if err != nil {
 		return nil, err
 	}
 
-	if clientID != messageHandler.clientID {
+	if clientId != messageHandler.clientId {
 		return nil, nil
 	}
 	return fruitRecords, nil
