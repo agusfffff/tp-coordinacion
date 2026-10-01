@@ -20,23 +20,26 @@ func NewMessageHandler() MessageHandler {
 }
 
 func (messageHandler *MessageHandler) SerializeDataMessage(fruitRecord fruititem.FruitItem) (*middleware.Message, error) {
-	data := []fruititem.FruitItem{fruitRecord}
-	return inner.SerializeMessage(data, messageHandler.clientId, false)
+	return inner.SerializeData(inner.DataMessage{
+		ClientId: messageHandler.clientId,
+		Records:  []fruititem.FruitItem{fruitRecord},
+	})
 }
 
 func (messageHandler *MessageHandler) SerializeEOFMessage() (*middleware.Message, error) {
-	data := []fruititem.FruitItem{}
-	return inner.SerializeMessage(data, messageHandler.clientId, true)
+	return inner.SerializeEOF(inner.EOFMessage{
+		ClientId: messageHandler.clientId,
+	})
 }
 
 func (messageHandler *MessageHandler) DeserializeResultMessage(message *middleware.Message) ([]fruititem.FruitItem, error) {
-	fruitRecords, clientId, _, err := inner.DeserializeMessage(message)
+	result, err := inner.DeserializeData(message)
 	if err != nil {
 		return nil, err
 	}
 
-	if clientId != messageHandler.clientId {
+	if result.ClientId != messageHandler.clientId {
 		return nil, nil
 	}
-	return fruitRecords, nil
+	return result.Records, nil
 }
