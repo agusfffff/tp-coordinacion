@@ -8,6 +8,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/fruititem"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/messageprotocol/inner"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/middleware"
+	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/shutdown"
 )
 
 type AggregationConfig struct {
@@ -57,6 +58,8 @@ func NewAggregation(config AggregationConfig) (*Aggregation, error) {
 }
 
 func (aggregation *Aggregation) Run() {
+	defer aggregation.closeAll()
+	shutdown.StopConsumingOnSignal(aggregation.inputExchange)
 	aggregation.inputExchange.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		aggregation.handleMessage(msg, ack, nack)
 	})
@@ -169,4 +172,15 @@ func (aggregation *Aggregation) buildFruitTop(clientId int) []fruititem.FruitIte
 	})
 	finalTopSize := min(aggregation.topSize, len(fruitItems))
 	return fruitItems[:finalTopSize]
+}
+
+func (aggregation *Aggregation) closeAll() {
+	middlewares := []middleware.Middleware{aggregation.inputExchange, aggregation.outputQueue}
+
+	for _, m := range middlewares {
+		err := m.Close()
+		if err != nil {
+			slog.Error("Closing middleware", "err", err)
+		}
+	}
 }

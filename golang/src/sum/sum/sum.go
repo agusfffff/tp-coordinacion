@@ -9,6 +9,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/fruititem"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/messageprotocol/inner"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/middleware"
+	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/shutdown"
 )
 
 type SumConfig struct {
@@ -63,7 +64,7 @@ func NewSum(config SumConfig) (*Sum, error) {
 
 func (sum *Sum) Run() {
 	defer sum.closeAll()
-
+	shutdown.StopConsumingOnSignal(sum.inputQueue)
 	sum.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		sum.handleMessage(msg, ack, nack)
 	})

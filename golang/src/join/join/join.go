@@ -7,6 +7,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/fruititem"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/messageprotocol/inner"
 	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/middleware"
+	"github.com/7574-sistemas-distribuidos/tp-coordinacion/common/shutdown"
 )
 
 type JoinConfig struct {
@@ -55,6 +56,8 @@ func NewJoin(config JoinConfig) (*Join, error) {
 }
 
 func (join *Join) Run() {
+	defer join.closeAll()
+	shutdown.StopConsumingOnSignal(join.inputQueue)
 	join.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		join.handleMessage(msg, ack, nack)
 	})
@@ -131,4 +134,15 @@ func (join *Join) buildFruitTop(clientId int) []fruititem.FruitItem {
 	})
 	finalTopSize := min(join.topSize, len(fruitItems))
 	return fruitItems[:finalTopSize]
+}
+
+func (join *Join) closeAll() {
+	middlewares := []middleware.Middleware{join.inputQueue, join.outputQueue}
+
+	for _, m := range middlewares {
+		err := m.Close()
+		if err != nil {
+			slog.Error("Closing middleware", "err", err)
+		}
+	}
 }
