@@ -1,8 +1,8 @@
 package shutdown
 
 import (
+	"context"
 	"log/slog"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -10,14 +10,14 @@ import (
 )
 
 func StopConsumingOnSignal(consumer middleware.Middleware) {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-signals
+		<-ctx.Done()
+		stop()
 		slog.Info("recieved SIGTERM")
 		if err := consumer.StopConsuming(); err != nil {
-			slog.Error("Stopping consumer", "err", err)
+			slog.Error("While stopping consumer", "err", err)
 		}
 	}()
 }
