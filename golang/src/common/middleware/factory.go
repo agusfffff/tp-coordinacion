@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -46,12 +45,11 @@ func CreateQueueMiddleware(queueName string, connectionSettings ConnSettings) (M
 }
 
 type queueMiddleware struct {
-	conn      *amqp.Connection
-	channel   *amqp.Channel
-	queue     string
-	consuming atomic.Bool
-	id        string
-	mut       sync.Mutex
+	conn    *amqp.Connection
+	channel *amqp.Channel
+	queue   string
+	id      string
+	mut     sync.Mutex
 }
 
 // Close implements [middleware.Middleware].
@@ -59,13 +57,14 @@ func (q *queueMiddleware) Close() error {
 	return closeChAndConn(q.channel, q.conn)
 }
 
-// StartConsuming implements [middleware.Middleware].
 func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func(), nack func())) error {
-	if !q.consuming.CompareAndSwap(false, true) {
+	consumerTag := consumerName + q.queue
+
+	q.mut.Lock()
+	if q.id != "" {
+		q.mut.Unlock()
 		return nil
 	}
-
-	consumerTag := consumerName + q.queue
 
 	msgCh, err := q.channel.Consume(
 		q.queue,
@@ -78,11 +77,10 @@ func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 	)
 
 	if err != nil {
-		q.consuming.Store(false)
+		q.mut.Unlock()
 		return classifyError(err)
 	}
 
-	q.mut.Lock()
 	q.id = consumerTag
 	q.mut.Unlock()
 
@@ -91,7 +89,6 @@ func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 	q.mut.Lock()
 	q.id = ""
 	q.mut.Unlock()
-	q.consuming.Store(false)
 	return err
 
 }
@@ -118,14 +115,9 @@ func consumeLoop(ch *amqp.Channel, msgCh <-chan amqp.Delivery, callbackFunc func
 	return nil
 }
 
-// StopConsuming implements [middleware.Middleware].
 func (q *queueMiddleware) StopConsuming() error {
 	if q.channel == nil || q.channel.IsClosed() {
 		return ErrMessageMiddlewareDisconnected
-	}
-
-	if !q.consuming.Load() {
-		return nil
 	}
 
 	q.mut.Lock()
@@ -170,14 +162,12 @@ func (q *queueMiddleware) Send(msg Message) error {
 }
 
 type exchangeMiddleware struct {
-	conn      *amqp.Connection
-	channel   *amqp.Channel
-	exchange  string
-	keys      []string
-	consuming atomic.Bool
-	id        string
-	queue     string
-	mut       sync.Mutex
+	conn     *amqp.Connection
+	channel  *amqp.Channel
+	exchange string
+	keys     []string
+	id       string
+	mut      sync.Mutex
 }
 
 func CreateExchangeMiddleware(exchange string, keys []string, connectionSettings ConnSettings) (Middleware, error) {
@@ -236,8 +226,9 @@ func (e *exchangeMiddleware) Send(msg Message) error {
 
 // StartConsuming implements [middleware.Middleware].
 func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack func(), nack func())) error {
-
-	if !e.consuming.CompareAndSwap(false, true) {
+	e.mut.Lock()
+	if e.id != "" {
+		e.mut.Unlock()
 		return nil
 	}
 
@@ -253,22 +244,20 @@ func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 	)
 
 	if err != nil {
-		e.consuming.Store(false)
+		e.mut.Unlock()
 		return classifyError(err)
 	}
 
-	queue := q.Name
-
-	err = bindKeys(e.channel, queue, e.exchange, e.keys)
+	err = bindKeys(e.channel, q.Name, e.exchange, e.keys)
 	if err != nil {
-		e.consuming.Store(false)
+		e.mut.Unlock()
 		return err
 	}
 
-	consumerTag := consumerName + queue
+	consumerTag := consumerName + q.Name
 
 	msgCh, err := e.channel.Consume(
-		queue,
+		q.Name,
 		consumerTag,
 		false,
 		false,
@@ -278,24 +267,20 @@ func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 	)
 
 	if err != nil {
-		e.consuming.Store(false)
+		e.mut.Unlock()
 		return classifyError(err)
 	}
 
-	e.mut.Lock()
 	e.id = consumerTag
 	e.mut.Unlock()
-	e.queue = queue
 
 	err = consumeLoop(e.channel, msgCh, callbackFunc)
 
 	e.mut.Lock()
 	e.id = ""
 	e.mut.Unlock()
-	e.consuming.Store(false)
 
 	return err
-
 }
 
 func bindKeys(channel *amqp.Channel, queue string, exchange string, keys []string) error {
@@ -324,15 +309,12 @@ func (e *exchangeMiddleware) StopConsuming() error {
 		return ErrMessageMiddlewareDisconnected
 	}
 
-	if !e.consuming.Load() {
-		return nil
-	}
-
 	e.mut.Lock()
 	if e.id == "" {
 		e.mut.Unlock()
 		return nil
 	}
+
 	err := e.channel.Cancel(e.id, false)
 	e.mut.Unlock()
 
