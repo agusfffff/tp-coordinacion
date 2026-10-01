@@ -143,7 +143,7 @@ func (sum *Sum) sendToAggregators(clientId int) error {
 
 	clientRecords := sum.fruitItemMap[clientId]
 	for _, fruitData := range clientRecords {
-		i := sum.getAggregatorId(fruitData.Fruit)
+		i := sum.getAggregatorId(fruitData.Fruit, clientId)
 		recordsByAggregator[i] = append(recordsByAggregator[i], fruitData)
 	}
 
@@ -208,8 +208,9 @@ func (sum *Sum) closeAll() {
 	}
 }
 
-func (sum *Sum) getAggregatorId(fruit string) int {
+func (sum *Sum) getAggregatorId(fruit string, clientId int) int {
 	hash := fnv.New32a()
 	hash.Write([]byte(fruit))
-	return int(hash.Sum32() % uint32(len(sum.aggregatorsExchange)))
+	return int((hash.Sum32() + uint32(clientId)) % uint32(len(sum.aggregatorsExchange)))
+
 }
