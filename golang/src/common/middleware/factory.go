@@ -17,6 +17,7 @@ var (
 	ErrCreateMiddlewareDeclare = errors.New("create middleware: declare failed")
 )
 
+const prefetchMsg = 1
 const publishTimeout = 5 * time.Second
 const consumerName = "consumer-"
 
@@ -64,6 +65,13 @@ func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func
 	if q.id != "" {
 		q.mut.Unlock()
 		return nil
+	}
+
+	err := q.channel.Qos(prefetchMsg, 0, false)
+
+	if err != nil {
+		q.mut.Unlock()
+		return classifyError(err)
 	}
 
 	msgCh, err := q.channel.Consume(
@@ -230,6 +238,13 @@ func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 	if e.id != "" {
 		e.mut.Unlock()
 		return nil
+	}
+
+	err := e.channel.Qos(prefetchMsg, 0, false)
+
+	if err != nil {
+		e.mut.Unlock()
+		return classifyError(err)
 	}
 
 	queueName := e.exchange + "." + strings.Join(e.keys, ".")
