@@ -57,10 +57,10 @@ func NewAggregation(config AggregationConfig) (*Aggregation, error) {
 	}, nil
 }
 
-func (aggregation *Aggregation) Run() {
+func (aggregation *Aggregation) Run() error {
 	defer aggregation.closeAll()
 	shutdown.StopConsumingOnSignal(aggregation.inputExchange)
-	aggregation.inputExchange.StartConsuming(func(msg middleware.Message, ack, nack func()) {
+	return aggregation.inputExchange.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		aggregation.handleMessage(msg, ack, nack)
 	})
 }

@@ -55,10 +55,10 @@ func NewJoin(config JoinConfig) (*Join, error) {
 	}, nil
 }
 
-func (join *Join) Run() {
+func (join *Join) Run() error {
 	defer join.closeAll()
 	shutdown.StopConsumingOnSignal(join.inputQueue)
-	join.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
+	return join.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		join.handleMessage(msg, ack, nack)
 	})
 }

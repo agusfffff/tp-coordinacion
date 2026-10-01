@@ -62,10 +62,10 @@ func NewSum(config SumConfig) (*Sum, error) {
 	}, nil
 }
 
-func (sum *Sum) Run() {
+func (sum *Sum) Run() error {
 	defer sum.closeAll()
 	shutdown.StopConsumingOnSignal(sum.inputQueue)
-	sum.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
+	return sum.inputQueue.StartConsuming(func(msg middleware.Message, ack, nack func()) {
 		sum.handleMessage(msg, ack, nack)
 	})
 }
