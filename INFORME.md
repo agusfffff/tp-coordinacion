@@ -103,4 +103,4 @@ Cada Aggregator guarda el conteo de cada Sum y solamente cierra cuando da el tot
 
 ### Mejoras 
 - Cambiaria a la nueva propuesta definitivamente. 
-- Implemetnaria el Send por Key, de manera de reutilizar un middleware para multiples keys. 
+- Implementaria el Send por Key, de manera de reutilizar un middleware para multiples keys. 
