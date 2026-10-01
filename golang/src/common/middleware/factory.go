@@ -20,7 +20,6 @@ var (
 
 const publishTimeout = 5 * time.Second
 const consumerName = "consumer-"
-const prefetchMsg = 1
 
 func CreateQueueMiddleware(queueName string, connectionSettings ConnSettings) (Middleware, error) {
 	conn, ch, err := dialAndConnectCh(connectionSettings.Hostname, connectionSettings.Port)
@@ -64,17 +63,6 @@ func (q *queueMiddleware) Close() error {
 func (q *queueMiddleware) StartConsuming(callbackFunc func(msg Message, ack func(), nack func())) error {
 	if !q.consuming.CompareAndSwap(false, true) {
 		return nil
-	}
-
-	err := q.channel.Qos(
-		prefetchMsg,
-		0,
-		false,
-	)
-
-	if err != nil {
-		q.consuming.Store(false)
-		return classifyError(err)
 	}
 
 	consumerTag := consumerName + q.queue
@@ -251,17 +239,6 @@ func (e *exchangeMiddleware) StartConsuming(callbackFunc func(msg Message, ack f
 
 	if !e.consuming.CompareAndSwap(false, true) {
 		return nil
-	}
-
-	err := e.channel.Qos(
-		prefetchMsg,
-		0,
-		false,
-	)
-
-	if err != nil {
-		e.consuming.Store(false)
-		return classifyError(err)
 	}
 
 	queueName := e.exchange + "." + strings.Join(e.keys, ".")
